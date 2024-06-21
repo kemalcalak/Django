@@ -14,7 +14,7 @@ from myapp.models import Product
 class ProductForm(forms.ModelForm):
     class Meta:
         model = Product
-        fields = ('name','price','description','slug')
+        fields = ('name','price','description','slug','image')
         error_messages = {
             "name": {
                 "required": "name gerekli alan...",
@@ -34,3 +34,5 @@ class ProductForm(forms.ModelForm):
             "slug": widgets.TextInput(attrs={"class":"form-control"}),
         }
         
+class UploadForm(forms.Form):
+    image = forms.FileField()
