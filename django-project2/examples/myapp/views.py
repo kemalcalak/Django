@@ -1,28 +1,76 @@
-from django.http.response import Http404, HttpResponseNotFound
+from django.http.response import Http404, HttpResponseNotFound, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
-import datetime
-from .models import Product
-from django.db.models import Avg, Min, Max
-
-data = {
-    "telefon": ["samsung s20","samsung s21","iphone 12"],
-    "bilgisayar": ["laptop 1","laptop 2"],
-    "elektronik": []
-}
+from .models import Product, UploadModel
+from .forms import ProductForm, UploadForm
+from django.contrib.auth.decorators import login_required
 
 def index(request):
-    products = Product.objects.all().order_by("-price")
-    product_count = Product.objects.filter(isActive=True).count()
-    price = Product.objects.filter(isActive=True).aggregate(Avg("price"), Min("price"), Max("price"))
+    products = Product.objects.filter(isActive=True).order_by("-price")
 
     context = {
         "products": products,
-        "product_count": product_count,
-        "price" : price
     }
 
-    return render(request, 'index.html', context)
+    return render(request, 'myapp/index.html', context)
+
+@login_required(login_url='/account/login')
+def list(request):
+
+    if 'q' in request.GET and request.GET.get('q'):
+        q = request.GET['q']
+        products = Product.objects.filter(name__contains=q).order_by("-price")
+    else:
+        products = Product.objects.all().order_by("-price")
+
+    context = {
+        "products": products,
+    }
+
+    return render(request, 'myapp/list.html', context)
+
+@login_required(login_url='/account/login')
+def create(request):
+    if request.method == 'POST':
+        form = ProductForm(request.POST, request.FILES)
+
+        if form.is_valid():
+            form.save()
+            return redirect("product_list") 
+    else:
+        form = ProductForm()
+        
+    return render(request, "myapp/create.html", {
+        "form": form
+    })
+
+def edit(request, id):
+    product = get_object_or_404(Product, pk=id)
+
+    if request.method == "POST":
+        form = ProductForm(request.POST, request.FILES, instance=product)
+
+        if form.is_valid():
+            form.save()
+            return redirect("product_list")
+
+    else:
+        form = ProductForm(instance=product)
+
+    return render(request, "myapp/edit.html", {
+        "form": form
+    })
+
+def delete(request, id):
+    product = get_object_or_404(Product, pk=id)
+
+    if request.method == "POST":
+        product.delete()
+        return redirect("product_list")
+
+    return render(request, "myapp/delete-confirm.html", {
+        "product": product
+    })
 
 def details(request, slug):
 
@@ -31,28 +79,23 @@ def details(request, slug):
     context = {
         "product": product
     }
-    return render(request, "details.html", context)
+    return render(request, "myapp/details.html", context)
 
-def getProductsByCategoryId(request, category_id):
-    category_list = list(data.keys())
+def upload(request):
+    if request.method == "POST":
+        form = UploadForm(request.POST, request.FILES)
 
-    if category_id > len(category_list):
-        return HttpResponseNotFound("yanlış kategori seçimi")
-        
-    category_name = category_list[category_id-1]
-    
-    redirect_path = reverse("products_by_category", args= [category_name])
-    
-    return redirect(redirect_path)
+        if form.is_valid():  
+            model = UploadModel(image = request.FILES["image"])
+            model.save()
+            return render(request, "myapp/success.html")
+    else:
+        form = UploadForm()
 
-def getProductsByCategory(request, category):
-    try:
-        products = data[category]        
-        return render(request, 'products.html', {
-            "category": category,
-            "products": products,
-            "now": datetime.datetime.now()
-        })
-    except:
-        return HttpResponseNotFound(f"<h1>yanlış kategori seçimi</h1>")
+    return render(request, "myapp/upload.html", {
+        "form": form
+    })
+
+
+
 
